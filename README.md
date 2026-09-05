@@ -1,4 +1,4 @@
-# LifeLink AI+ Multi-Hospital Dashboard — Phase 4
+# LifeLink AI+ Multi-Hospital Dashboard
 
 LifeLink is a multi-hospital emergency-response platform. This repository contains the **hospital-facing React web client**: the operational console used by an authenticated hospital to review allocated emergency requests, accept or reject them, assign its resources, follow road routes, and progress accepted cases.
 
