@@ -1,8 +1,11 @@
-// Provisional paths: backend token determines the hospital; no form-supplied owner.
-export const endpoints = {
- register: '/auth/hospital/register',
- resources: '/hospital/resources',
- doctors: '/hospital/resources/doctors',
- ambulances: '/hospital/resources/ambulances',
+﻿export const endpoints = {
+  register: '/users/',
+  login: '/users/login',
+  hospitals: '/hospitals',
+  sos: '/sos',
+  resources: '/hospitals',
+  doctors: '/hospitals/doctors',
+  ambulances: '/hospitals/ambulances',
 };
-export const resourceItemPath = (base: string, id: string) => `${base}/${encodeURIComponent(id)}`;
+export const resourceItemPath = (base: string, id: string) => ${base}/;
+
