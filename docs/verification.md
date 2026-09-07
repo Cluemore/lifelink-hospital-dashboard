@@ -12,11 +12,14 @@
 - Assigned ambulance cannot be deleted while its case is active.
 - Existing accept → assignment → en route → pickup → arrival → completion flow;
   completion returns the ambulance to AVAILABLE.
-- Registration is pending, duplicates are rejected, password is not persisted,
-  and a pending registration cannot log in as an approved hospital.
+- Mock registration is immediately approved, generates sequential `HSP-NNN` IDs,
+  rejects duplicate licenses/emails and persists only salted password hashes.
+- Newly registered credentials work immediately and after logout/reload; a wrong
+  password fails. New tenants start with zero beds, no doctors, no ambulances and
+  no emergencies, and cross-hospital reads remain denied.
 - Persisted JSON round-trip and fresh mock-store module initialization restore
-  edited beds and the pending application. Demo reset clears registrations and
-  restores initial data.
+  registered hospitals and their own edited resources. Demo reset removes local
+  registrations/accounts and restores the four original hospitals.
 - API resource transport methods, encoded record IDs, token header and principal-
   scoped paths tested with a fetch stub; registration endpoint exercised.
 - Existing protected route remains in place around dashboard and case routes.
@@ -47,7 +50,11 @@ large-bundle warning (maps/charts); it does not prevent compilation.
    Confirm it has its own unchanged resource data.
 8. Logout → Join LifeLink. Try missing fields, invalid email, invalid PIN,
    short/mismatched passwords, invalid coordinates, and valid fictional details.
-   Expect Registration submitted / PENDING APPROVAL; original logins still work.
-9. Try small screens and keyboard-only use. Dialogs use native showModal() with
+   Expect the success screen and an `HSP-NNN` ID. Go to Login and use the same
+   administrator email/password. Confirm zero resources/emergencies, edit one
+   resource, refresh, logout and log in again, then verify the edit remains.
+9. Register another fictional hospital and confirm its ID increments and it cannot
+   see the first new hospital's resources. The four original logins must still work.
+10. Try small screens and keyboard-only use. Dialogs use native showModal() with
    focus containment and Escape cancellation; they restore the previous focus.
-10. Reset demo data clears all local hospital applications and demo edits.
+11. Reset demo data clears local hospital accounts, signs out and restores demo data.

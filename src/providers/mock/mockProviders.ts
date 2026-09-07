@@ -1,4 +1,4 @@
-import { emergencyActivityByHospital, getHospitalById, hospitalAccounts, hospitals } from '../../data/mockData';
+import { emergencyActivityByHospital, hospitalAccounts } from '../../data/mockData';
 import type { Emergency, EmergencyStatus, Hospital, HospitalId } from '../../types';
 import { cloneValue, getMockState, resetMockState, saveMockState } from '../../services/mockStore';
 import type { ProviderSet } from '../contracts';
@@ -12,7 +12,23 @@ const delay = (ms = 180) => new Promise((resolve) => globalThis.setTimeout(resol
 const timeNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
 function hospitalFor(id: HospitalId | null): Hospital | null {
-  return id ? hospitals.find((hospital) => hospital.id === id) ?? null : null;
+  return id ? getMockState().hospitals.find((hospital) => hospital.id === id) ?? null : null;
+}
+
+function nextHospitalId(): HospitalId {
+  const ids = new Set(getMockState().hospitals.map((hospital) => hospital.id));
+  let number = Math.max(4, ...[...ids].map((id) => /^HSP-(\d+)$/.exec(id)?.[1]).filter(Boolean).map(Number)) + 1;
+  while (ids.has(`HSP-${String(number).padStart(3, '0')}`)) number += 1;
+  return `HSP-${String(number).padStart(3, '0')}`;
+}
+
+function bytesToHex(bytes: ArrayBuffer) {
+  return [...new Uint8Array(bytes)].map((value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(password: string, salt: string) {
+  const encoded = new TextEncoder().encode(`${salt}:${password}`);
+  return bytesToHex(await crypto.subtle.digest('SHA-256', encoded));
 }
 
 function scopedEmergency(id: string, hospitalId: HospitalId) {
@@ -59,9 +75,57 @@ export const mockProviders: ProviderSet = {
       validateRegistration(payload); await delay(250);
       const {password: _password, ...safe} = payload;
       const state = getMockState();
-      if (state.registrations.some(r => r.licenseNumber.trim().toLowerCase() === safe.licenseNumber.trim().toLowerCase() || r.adminEmail.toLowerCase() === safe.adminEmail.toLowerCase()) || hospitalAccounts.some(a => a.email.toLowerCase() === safe.adminEmail.toLowerCase())) throw new Error('This hospital license or administrator email is already registered.');
-      const record = {...safe, id: crypto.randomUUID(), status: 'PENDING_APPROVAL' as const, submittedAt: new Date().toISOString()};
-      state.registrations.push(record); saveMockState(); return cloneValue(record);
+      const emails = [safe.adminEmail, safe.hospitalEmail].map((email) => email.trim().toLowerCase());
+      const duplicate = state.registrations.some((registration) =>
+        registration.licenseNumber.trim().toLowerCase() === safe.licenseNumber.trim().toLowerCase()
+        || emails.includes(registration.adminEmail.trim().toLowerCase())
+        || emails.includes(registration.hospitalEmail.trim().toLowerCase()))
+        || hospitalAccounts.some((account) => emails.includes(account.email.toLowerCase()))
+        || state.accounts.some((account) => emails.includes(account.email.toLowerCase()));
+      if (duplicate) throw new Error('This hospital license or email is already registered.');
+
+      const passwordSalt = crypto.randomUUID();
+      const passwordHash = await hashPassword(payload.password, passwordSalt);
+      const hospitalId = nextHospitalId();
+      const submittedAt = new Date().toISOString();
+      const hospital: Hospital = {
+        id: hospitalId,
+        name: safe.hospitalName.trim(),
+        shortName: safe.hospitalName.trim(),
+        department: 'Emergency Department',
+        latitude: safe.latitude ?? 19.076,
+        longitude: safe.longitude ?? 72.8777,
+        address: safe.address.trim(),
+        area: safe.city.trim(),
+        city: safe.city.trim(),
+        networkRegion: safe.state.trim(),
+        emergencyBeds: { available: 0, total: 0 },
+        icuBeds: { available: 0, total: 0 },
+        averageResponseTimeMinutes: 0,
+        completedToday: 0,
+        acceptanceRate: 0,
+        email: safe.hospitalEmail.trim(),
+        capabilities: [],
+        specialities: [],
+        status: 'CONNECTED',
+        availabilityUpdatedAt: submittedAt,
+        availabilitySource: 'mock',
+        availabilityVerificationStatus: 'UNVERIFIED',
+      };
+      const record = { ...safe, id: crypto.randomUUID(), hospitalId, status: 'APPROVED' as const, submittedAt };
+      state.hospitals.push(hospital);
+      state.accounts.push({ hospitalId, email: safe.adminEmail.trim().toLowerCase(), passwordHash, passwordSalt });
+      state.registrations.push(record);
+      state.resources[hospitalId] = {
+        updatedAt: submittedAt,
+        beds: {
+          general: { total: 0, occupied: 0, available: 0 },
+          icu: { total: 0, occupied: 0, available: 0 },
+          emergency: { total: 0, occupied: 0, available: 0 },
+        },
+      };
+      saveMockState();
+      return cloneValue(record);
     },
     getSession() {
       if (typeof window === 'undefined') return null;
@@ -72,9 +136,15 @@ export const mockProviders: ProviderSet = {
     },
     async login(email, password) {
       await delay(420);
-      const account = hospitalAccounts.find((item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password);
-      if (!account) throw new Error('Email or password is incorrect. Please use one of the documented demo accounts.');
-      const hospital = hospitalFor(account.hospitalId);
+      const normalizedEmail = email.trim().toLowerCase();
+      const account = hospitalAccounts.find((item) => item.email.toLowerCase() === normalizedEmail && item.password === password);
+      const registeredAccount = getMockState().accounts.find((item) => item.email === normalizedEmail);
+      const registeredPasswordMatches = registeredAccount
+        ? await hashPassword(password, registeredAccount.passwordSalt) === registeredAccount.passwordHash
+        : false;
+      const hospitalId = account?.hospitalId ?? (registeredPasswordMatches ? registeredAccount?.hospitalId : undefined);
+      if (!hospitalId) throw new Error('Email or password is incorrect.');
+      const hospital = hospitalFor(hospitalId);
       if (!hospital) throw new Error('Hospital account is not available.');
       window.localStorage.setItem(SESSION_KEY, hospital.id);
       return { hospital: cloneValue(hospital) };
@@ -84,11 +154,11 @@ export const mockProviders: ProviderSet = {
     },
   },
   hospital: {
-    async getById(hospitalId) { assertHospital(hospitalId); await delay(80); return cloneValue(getHospitalById(hospitalId)); },
+    async getById(hospitalId) { assertHospital(hospitalId); await delay(80); return cloneValue(hospitalFor(hospitalId)!); },
     async getStats(hospitalId) { assertHospital(hospitalId);
       await delay();
       const state = getMockState();
-      const hospital = getHospitalById(hospitalId);
+      const hospital = hospitalFor(hospitalId)!;
       const cases = state.emergencies.filter((item) => item.hospitalId === hospitalId);
       const newCases = cases.filter((item) => item.requestStatus === 'PENDING');
       const ongoing = cases.filter((item) => item.requestStatus === 'ACCEPTED' && ongoingStatuses.includes(item.status));
@@ -114,7 +184,7 @@ export const mockProviders: ProviderSet = {
         acceptanceRate: hospital.acceptanceRate,
       });
     },
-    async getActivity(hospitalId) { assertHospital(hospitalId); await delay(90); return cloneValue(emergencyActivityByHospital[hospitalId]); },
+    async getActivity(hospitalId) { assertHospital(hospitalId); await delay(90); return cloneValue(emergencyActivityByHospital[hospitalId] ?? []); },
   },
   emergency: {
     async getNew(hospitalId) { assertHospital(hospitalId);
@@ -261,6 +331,10 @@ export const mockProviders: ProviderSet = {
     },
   },
   demo: {
-    async reset() { await delay(120); resetMockState(); },
+    async reset() {
+      await delay(120);
+      if (typeof window !== 'undefined') window.localStorage.removeItem(SESSION_KEY);
+      resetMockState();
+    },
   },
 };

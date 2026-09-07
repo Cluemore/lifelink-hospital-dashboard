@@ -442,7 +442,7 @@ Send this checklist to the backend teammate:
 
 ---
 
-## Phase 5 enhancement: resource management and hospital onboarding
+## Version 5.x enhancement: resource management and prototype hospital onboarding
 
 This section supersedes earlier read-only resource assumptions. Existing Phase 4
 routing, emergency lifecycle, OSRM integration and four demo accounts remain.
@@ -463,17 +463,22 @@ routing, emergency lifecycle, OSRM integration and four demo accounts remain.
   No new resource summary is independently hardcoded. General-bed baseline is zero
   because Phase 4 supplied no general-bed data; staff can enter the real capacity.
 - `/signup`: hospital and administrator information, optional location, initial
-  capacity and password confirmation. Registration stays separate from approved
-  hospital accounts. Successful mock registrations are `PENDING_APPROVAL`.
-- Mock registration validates but discards the password. It creates no credential,
-  login, email, backend request, approval or allocated emergency. Existing four
-  demo accounts retain their original credentials.
+  capacity and password confirmation. In Mock Mode, a successful submission
+  automatically creates an approved hospital workspace and login account.
+- New mock hospitals receive the next available `HSP-NNN` ID, zero operational
+  beds, no doctors, no ambulances and no emergencies. Submitted capacity remains
+  registration metadata; staff confirm live prototype data in `/resources`.
+- The administrator password is stored only as a salted SHA-256 hash in browser
+  mock state, never as plaintext. This is prototype persistence, not production
+  authentication. Existing four demo accounts retain their original credentials.
 - Mock data uses the existing `lifelink-demo-operational-state-v3` local storage
-  key. Old records are migrated by filling missing resource/registration fields.
+  key. Old records are migrated by filling missing hospital, account, resource
+  and registration fields.
   Changes survive navigation and refresh when local storage is available. If
   browser storage is unavailable, the existing in-memory fallback applies.
-- Reset demo data resets all four hospitals' cases/resources AND registrations.
-  Reset is hidden in API mode. It uses an in-app confirmation dialog.
+- Reset demo data restores the four demo hospitals and removes locally registered
+  hospital accounts, their resources and active session. Reset is hidden in API
+  mode and uses an in-app confirmation dialog.
 
 ### Domain models
 
@@ -515,7 +520,9 @@ Registration input: hospitalName, licenseNumber, hospitalType, address, city, st
 pinCode, emergencyPhone, hospitalEmail; optional website, latitude, longitude;
 adminName, designation, adminEmail, adminPhone, password; generalBeds, icuBeds,
 emergencyBeds, ambulanceCount. The response omits password and includes `id`,
-`status`, `submittedAt`. Confirm password is client-only and is never sent.
+`status`, `submittedAt` and, when assigned, `hospitalId`. Confirm password is
+client-only and is never sent. Mock Mode returns `APPROVED`; the API may retain
+`PENDING_APPROVAL` until the real backend/admin workflow is implemented.
 
 ### Provisional API contract (not an implemented backend)
 
@@ -526,7 +533,7 @@ API provider. Adapt DTO field names and routes once FastAPI OpenAPI is final.
 
 | Method | Path | Request | Response |
 |---|---|---|---|
-| POST | `/auth/hospital/register` | HospitalRegistrationInput | HospitalRegistration, normally PENDING_APPROVAL |
+| POST | `/auth/hospital/register` | HospitalRegistrationInput | HospitalRegistration; backend approval policy remains server-controlled |
 | GET | `/hospital/resources` | — | HospitalResourceSummary |
 | PATCH | `/hospital/resources` | `{ beds: { general: {total, occupied}, icu: {total, occupied}, emergency: {total, occupied} } }` | HospitalResourceSummary |
 | GET | `/hospital/resources/doctors` | — | Doctor[] |
@@ -575,7 +582,8 @@ password logging, validate organization/license uniqueness and contact ownership
 rate-limit signup/login, and enforce approval before emergency access. Approval
 transitions: PENDING_APPROVAL → APPROVED or REJECTED; APPROVED → SUSPENDED;
 reinstatement/reapplication policies require an authorized admin workflow.
-No admin approval implementation is included here. Pending/rejected/suspended
+No admin approval implementation is included here. Mock Mode bypasses manual
+approval only for the frontend prototype. In API Mode, pending/rejected/suspended
 accounts must not receive active hospital permissions. Backend controls staff
 roles, audit trails, resource ownership, active-assignment constraints, and
 transactional updates under concurrent case assignment.

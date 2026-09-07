@@ -239,4 +239,10 @@ export interface HospitalRegistrationInput {
  adminName: string; designation: string; adminEmail: string; adminPhone: string; password: string;
  generalBeds: number; icuBeds: number; emergencyBeds: number; ambulanceCount: number;
 }
-export interface HospitalRegistration extends Omit<HospitalRegistrationInput, 'password'> { id: string; status: HospitalApprovalStatus; submittedAt: string }
+export interface HospitalRegistration extends Omit<HospitalRegistrationInput, 'password'> {
+ id: string;
+ /** Assigned immediately in mock mode; a future API may omit it until approval. */
+ hospitalId?: HospitalId;
+ status: HospitalApprovalStatus;
+ submittedAt: string;
+}
