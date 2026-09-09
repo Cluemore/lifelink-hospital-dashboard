@@ -31,6 +31,9 @@ async function responseBody(response: Response): Promise<unknown> {
   try { return await response.json(); } catch { return undefined; }
 }
 
+// Login paths — a 401 on these means wrong credentials, NOT session expired.
+const LOGIN_PATHS = ['/users/login', '/auth/login', '/auth/hospital/login'];
+
 export const httpClient = {
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = tokenStore.get();
@@ -46,16 +49,40 @@ export const httpClient = {
         },
       });
     } catch {
-      throw new ApiClientError('Unable to connect to the LifeLink backend.', { code: 'NETWORK_ERROR' });
+      throw new ApiClientError('Unable to connect to the LifeLink backend. Check your internet connection.', { code: 'NETWORK_ERROR' });
     }
 
     const body = await responseBody(response);
     if (!response.ok) {
-      if (response.status === 401) tokenStore.clear();
+      // Only clear token on 401 for non-login paths
+      const isLoginPath = LOGIN_PATHS.some((p) => path.endsWith(p));
+      if (response.status === 401 && !isLoginPath) tokenStore.clear();
+
       if (isApiErrorPayload(body)) {
         throw new ApiClientError(body.message, { code: body.code, status: response.status, details: body.details, requestId: body.request_id });
       }
-      throw new ApiClientError(response.status === 401 ? 'Your hospital session has expired.' : 'The LifeLink backend could not complete this request.', {
+
+      // Try to extract FastAPI detail message (e.g. "Invalid email or password.")
+      let fastApiDetail: string | undefined;
+      if (body && typeof body === 'object') {
+        const b = body as Record<string, unknown>;
+        if (typeof b.detail === 'string') fastApiDetail = b.detail;
+      }
+
+      let message: string;
+      if (response.status === 401) {
+        message = isLoginPath
+          ? (fastApiDetail ?? 'Invalid email or password. Please check your credentials.')
+          : (fastApiDetail ?? 'Your hospital session has expired. Please log in again.');
+      } else if (response.status === 422) {
+        message = fastApiDetail ?? 'Invalid request data. Please check all fields and try again.';
+      } else if (response.status === 404) {
+        message = fastApiDetail ?? 'The requested resource was not found.';
+      } else {
+        message = fastApiDetail ?? 'The LifeLink backend could not complete this request.';
+      }
+
+      throw new ApiClientError(message, {
         code: response.status === 401 ? 'UNAUTHORIZED' : 'API_REQUEST_FAILED',
         status: response.status,
       });
