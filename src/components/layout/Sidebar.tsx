@@ -39,7 +39,7 @@ export function Sidebar() {
 
   async function resetDemo() {
     await demoApi.reset();
-    window.location.assign('/dashboard');
+    window.location.assign('/login');
   }
 
   return <aside className="sidebar">
@@ -52,7 +52,7 @@ export function Sidebar() {
     <div className="sidebar__footer">
       <div className="hospital-card"><span className="eyebrow eyebrow--light">Current hospital · {currentHospital.id}</span><strong>{currentHospital.name}</strong><span>{currentHospital.area}, {currentHospital.city}</span><span className="system-status"><i /> LifeLink Connected</span></div>
       {isMockMode && <button type="button" className="sidebar__utility" onClick={()=>setResetOpen(true)}><RotateCcw size={14} /> Reset demo data</button>}
-      {resetOpen && <ConfirmationDialog title="Reset demo data?" message="This resets cases and resource changes for all four demo hospitals and removes locally saved hospital applications." onConfirm={resetDemo} onClose={()=>setResetOpen(false)}/>}
+      {resetOpen && <ConfirmationDialog title="Reset demo data?" message="This resets cases and resource changes for all four demo hospitals, and removes locally registered hospital accounts." onConfirm={resetDemo} onClose={()=>setResetOpen(false)}/>}
       <button type="button" className="sidebar__logout" onClick={signOut}><LogOut size={16} /> Logout</button>
     </div>
   </aside>;

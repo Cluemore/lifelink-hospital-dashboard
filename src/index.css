@@ -579,6 +579,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .editor-actions,.resource-actions { display:flex; gap:8px; flex-wrap:wrap; }
 .editor-actions { justify-content:flex-end; }
 .registration-page { max-width:1000px; margin:auto; padding:32px 24px 64px; }
+.registration-success { display:grid; justify-items:start; gap:12px; margin-top:48px; }
+.registration-success > svg { color:var(--teal); }
+.registration-success h1,.registration-success p { margin:0; }
+.registration-success h1 { font-family:var(--font-display); font-size:clamp(2.4rem,5vw,4.25rem); line-height:.95; font-weight:600; color:var(--teal-dark); }
+.registration-success p { max-width:720px; color:var(--muted); line-height:1.65; }
+.registration-success .button { margin-top:8px; }
 .resource-list-row > div { min-width:0; overflow-wrap:anywhere; }
 .resource-list-row { flex-wrap:wrap; gap:12px; }
 .attention-dot { display:inline-block; width:9px; height:9px; margin:0 6px; border-radius:50%; background:currentColor; vertical-align:middle; }
