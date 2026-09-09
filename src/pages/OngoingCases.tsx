@@ -20,9 +20,32 @@ export function OngoingCases() {
 
   useEffect(() => {
     if (!currentHospital) return;
-    setLoading(true);
-    setError('');
-    emergencyApi.getOngoing(currentHospital.id).then(setItems).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Please check the LifeLink backend connection.')).finally(() => setLoading(false));
+    let active = true;
+
+    const fetchItems = () => {
+      emergencyApi
+        .getOngoing(currentHospital.id)
+        .then((data) => {
+          if (active) {
+            setItems(data);
+            setLoading(false);
+          }
+        })
+        .catch((caught: unknown) => {
+          if (active) {
+            setError(caught instanceof Error ? caught.message : 'Please check the LifeLink backend connection.');
+            setLoading(false);
+          }
+        });
+    };
+
+    fetchItems();
+    const interval = setInterval(fetchItems, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [currentHospital, reloadKey]);
 
   const filtered = useMemo(() => items.filter((item) => {

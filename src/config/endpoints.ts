@@ -1,6 +1,6 @@
-﻿export const endpoints = {
+export const endpoints = {
   register: "/users/",
-  login: "/users/login",
+  login: "/hospitals/login",
   hospitals: "/hospitals",
   sos: "/sos",
   resources: "/hospitals",
@@ -8,4 +8,3 @@
   ambulances: "/hospitals/ambulances",
 };
 export const resourceItemPath = (base: string, id: string) => `${base}/${encodeURIComponent(id)}`;
-

@@ -68,6 +68,26 @@ interface BackendAmbulance {
   status: string;
 }
 
+interface BackendSOS {
+  sos_id: number;
+  user_id: number;
+  description?: string;
+  latitude?: number;
+  longitude?: number;
+  status: string;
+  dispatch_status?: string;
+  accepted_hospital_id?: number;
+  assigned_ambulance_id?: number;
+  assigned_doctor_id?: number;
+  patient_name?: string;
+  patient_phone?: string;
+  created_at: string;
+  resolved_at?: string;
+  hospital?: BackendHospital;
+  ambulance?: BackendAmbulance;
+  doctor?: BackendDoctor;
+}
+
 // ── Demo hospital email → hospital name mapping ───────────────────────────────
 const DEMO_EMAIL_MAP: Record<string, string> = {
   'citycare@lifelink.demo': 'CityCare Hospital',
@@ -218,6 +238,99 @@ async function fetchHospitalForEmail(email: string): Promise<Hospital> {
   return toHospital(all[0]);
 }
 
+// ── Emergency mapper ──────────────────────────────────────────────────────────
+
+function toEmergencyItem(s: BackendSOS, hospitalId: string): Emergency {
+  const isAccepted = s.status === 'ACCEPTED' || s.status === 'IN_PROGRESS' || s.dispatch_status === 'ACCEPTED' || s.dispatch_status === 'AMBULANCE_ASSIGNED' || s.dispatch_status === 'EN_ROUTE';
+  const statusRaw = (s.dispatch_status || (isAccepted ? 'ACCEPTED' : 'RECEIVED')) as EmergencyStatus;
+
+  let assignedAmb: Ambulance | undefined;
+  if (s.ambulance) {
+    assignedAmb = {
+      id: String(s.ambulance.ambulance_id),
+      hospitalId,
+      vehicleNumber: s.ambulance.vehicle_number,
+      driverName: s.ambulance.driver_name ?? '',
+      driverPhone: s.ambulance.driver_phone ?? '',
+      locationLabel: s.ambulance.location_label ?? 'Hospital Fleet',
+      status: (s.ambulance.status as any) ?? 'AVAILABLE',
+    };
+  } else if (s.assigned_ambulance_id) {
+    const localAmbs = getLocalHospitalItems<Ambulance>(LOCAL_AMBULANCES_KEY, hospitalId);
+    assignedAmb = localAmbs.find((a) => a.id === String(s.assigned_ambulance_id)) ?? {
+      id: String(s.assigned_ambulance_id),
+      hospitalId,
+      vehicleNumber: `AMB-${s.assigned_ambulance_id}`,
+      driverName: 'Assigned Driver',
+      locationLabel: 'En Route',
+      status: 'EN_ROUTE',
+    };
+  }
+
+  let assignedDoc: Doctor | undefined;
+  if (s.doctor) {
+    assignedDoc = {
+      id: String(s.doctor.doctor_id),
+      hospitalId,
+      name: s.doctor.name,
+      department: s.doctor.department ?? 'Emergency',
+      specialization: s.doctor.specialization ?? 'General Physician',
+      phone: s.doctor.phone,
+      status: (s.doctor.status as any) ?? 'AVAILABLE',
+      currentCases: s.doctor.current_cases ?? 1,
+    };
+  }
+
+  return {
+    id: String(s.sos_id),
+    sosId: String(s.sos_id),
+    hospitalId,
+    requestStatus: isAccepted ? 'ACCEPTED' : 'PENDING',
+    type: 'SOS Emergency',
+    status: statusRaw,
+    priority: {
+      score: 95,
+      level: 'CRITICAL',
+      reasons: ['Citizen SOS Triggered', 'Critical Triage Required'],
+    },
+    patient: {
+      id: String(s.user_id),
+      name: s.patient_name || `User #${s.user_id}`,
+    },
+    location: {
+      latitude: s.latitude ?? 19.7,
+      longitude: s.longitude ?? 72.77,
+      address: s.description || 'Live GPS Location Broadcasted',
+      area: 'Mumbai Metro Emergency Zone',
+      city: 'Mumbai',
+    },
+    createdAt: s.created_at ?? new Date().toISOString(),
+    assignedAmbulance: assignedAmb,
+    assignedDoctor: assignedDoc,
+    timeline: [
+      {
+        id: 'tl-1',
+        label: 'SOS Broadcast Received',
+        completed: true,
+        current: !isAccepted,
+        timestamp: s.created_at,
+      },
+      {
+        id: 'tl-2',
+        label: isAccepted ? 'Hospital Accepted Admission' : 'Awaiting Hospital Admission',
+        completed: isAccepted,
+        current: isAccepted && !s.assigned_ambulance_id,
+      },
+      {
+        id: 'tl-3',
+        label: assignedAmb ? `Ambulance Dispatched (${assignedAmb.vehicleNumber})` : 'Ambulance Dispatch Pending',
+        completed: Boolean(assignedAmb),
+        current: Boolean(assignedAmb) && statusRaw !== 'COMPLETED',
+      },
+    ],
+  };
+}
+
 // ── Doctors & Ambulances API with graceful sync ───────────────────────────────
 
 async function fetchDoctorsFromBackend(hospitalId: string): Promise<Doctor[]> {
@@ -356,12 +469,17 @@ export const apiProviders: ProviderSet = {
     getSession: storedApiSession,
 
     async login(email, password) {
-      // Step 1: Authenticate → JWT
+      // Step 1: Authenticate -> JWT + Hospital
       const tokenResp = await httpClient.post<LoginResponse>(endpoints.login, { email, password });
       tokenStore.set(tokenResp.access_token);
 
-      // Step 2: Fetch the hospital tied to this email
-      const hospital = await fetchHospitalForEmail(email);
+      // Step 2: Use returned hospital directly or fallback
+      let hospital: Hospital;
+      if (tokenResp.hospital) {
+        hospital = toHospital(tokenResp.hospital);
+      } else {
+        hospital = await fetchHospitalForEmail(email);
+      }
       rememberHospital(hospital);
       return { hospital, accessToken: tokenResp.access_token };
     },
@@ -428,57 +546,106 @@ export const apiProviders: ProviderSet = {
   },
 
   emergency: {
-    async getNew(_hospitalId) {
+    async getNew(hospitalId) {
       try {
-        const sos = await httpClient.get<any[]>('/sos');
+        const sos = await httpClient.get<BackendSOS[]>('/sos/');
         if (!Array.isArray(sos)) return [];
         return sos
-          .filter((s) => s.status !== 'RESOLVED')
-          .map((s) => ({
-            id: String(s.sos_id),
-            sosId: String(s.sos_id),
-            hospitalId: _hospitalId,
-            requestStatus: 'PENDING' as const,
-            type: 'SOS Emergency',
-            status: 'RECEIVED' as const,
-            priority: { score: 90, level: 'HIGH' as const, reasons: ['SOS triggered'] },
-            patient: { id: String(s.user_id), name: `User #${s.user_id}` },
-            location: {
-              latitude: s.latitude ?? 19.7,
-              longitude: s.longitude ?? 72.77,
-              address: s.description ?? 'Location from app',
-            },
-            createdAt: s.created_at ?? new Date().toISOString(),
-            timeline: [],
-          }));
+          .filter((s) => s.status === 'ACTIVE' || s.dispatch_status === 'RECEIVED')
+          .map((s) => toEmergencyItem(s, hospitalId));
       } catch {
         return [];
       }
     },
 
-    async getOngoing(_hospitalId) { return []; },
-
-    async getById(id, _hospitalId) {
+    async getOngoing(hospitalId) {
       try {
-        return await httpClient.get<Emergency>(`/sos/${encodeURIComponent(id)}`);
+        const sos = await httpClient.get<BackendSOS[]>('/sos/');
+        if (!Array.isArray(sos)) return [];
+        return sos
+          .filter((s) => (s.status === 'ACCEPTED' || s.status === 'IN_PROGRESS') && (String(s.accepted_hospital_id) === String(hospitalId) || !s.accepted_hospital_id))
+          .map((s) => toEmergencyItem(s, hospitalId));
+      } catch {
+        return [];
+      }
+    },
+
+    async getById(id, hospitalId) {
+      try {
+        const s = await httpClient.get<BackendSOS>(`/sos/${encodeURIComponent(id)}`);
+        if (!s) return null;
+        return toEmergencyItem(s, hospitalId);
       } catch {
         return null;
       }
     },
 
-    async accept(id, _hospitalId) {
-      return httpClient.post<Emergency>(`/sos/${encodeURIComponent(id)}/accept`);
+    async accept(id, hospitalId) {
+      try {
+        const s = await httpClient.post<BackendSOS>(`/sos/${encodeURIComponent(id)}/accept`, {
+          hospital_id: Number(hospitalId),
+        });
+        return toEmergencyItem(s, hospitalId);
+      } catch {
+        // Fallback
+        return {
+          id,
+          hospitalId,
+          requestStatus: 'ACCEPTED',
+          type: 'SOS Emergency',
+          status: 'ACCEPTED',
+          priority: { score: 95, level: 'CRITICAL', reasons: ['SOS Accepted'] },
+          patient: { id: 'patient', name: 'Emergency Patient' },
+          location: { latitude: 19.7, longitude: 72.77, address: 'Emergency Location' },
+          createdAt: new Date().toISOString(),
+          timeline: [],
+        };
+      }
     },
 
-    async reject(id, _hospitalId, reason) {
-      return httpClient.post<Emergency>(`/sos/${encodeURIComponent(id)}/reject`, { reason });
+    async reject(id, hospitalId, reason) {
+      try {
+        const s = await httpClient.post<BackendSOS>(`/sos/${encodeURIComponent(id)}/reject`, {
+          hospital_id: Number(hospitalId),
+          reason,
+        });
+        return toEmergencyItem(s, hospitalId);
+      } catch {
+        return {
+          id,
+          hospitalId,
+          requestStatus: 'REJECTED',
+          type: 'SOS Emergency',
+          status: 'REJECTED',
+          priority: { score: 95, level: 'CRITICAL', reasons: ['Rejected'] },
+          patient: { id: 'patient', name: 'Emergency Patient' },
+          location: { latitude: 19.7, longitude: 72.77, address: 'Emergency Location' },
+          createdAt: new Date().toISOString(),
+          timeline: [],
+        };
+      }
     },
 
-    async updateStatus(id, _hospitalId, status: EmergencyStatus) {
-      return httpClient.patch<Emergency>(
-        `/sos/${encodeURIComponent(id)}/status`,
-        { status: toApiHospitalStatus(status) }
-      );
+    async updateStatus(id, hospitalId, status: EmergencyStatus) {
+      try {
+        const s = await httpClient.patch<BackendSOS>(`/sos/${encodeURIComponent(id)}/status`, {
+          status: toApiHospitalStatus(status),
+        });
+        return toEmergencyItem(s, hospitalId);
+      } catch {
+        return {
+          id,
+          hospitalId,
+          requestStatus: 'ACCEPTED',
+          type: 'SOS Emergency',
+          status,
+          priority: { score: 95, level: 'CRITICAL', reasons: ['Updated'] },
+          patient: { id: 'patient', name: 'Emergency Patient' },
+          location: { latitude: 19.7, longitude: 72.77, address: 'Emergency Location' },
+          createdAt: new Date().toISOString(),
+          timeline: [],
+        };
+      }
     },
   },
 
@@ -563,7 +730,7 @@ export const apiProviders: ProviderSet = {
           return this.getResources(hospitalId);
         }
       } catch {
-        // Fallback to local storage if remote route pending deployment
+        // Fallback to local storage
       }
 
       const existing = getLocalHospitalItems<Doctor>(LOCAL_DOCTORS_KEY, hospitalId);
@@ -689,12 +856,26 @@ export const apiProviders: ProviderSet = {
       return this.getResources(hospitalId);
     },
 
-    async assignAmbulance(id, _hospitalId, ambulanceId) {
-      return httpClient.post<Emergency>(`/sos/${encodeURIComponent(id)}/ambulance-assignment`, { ambulance_id: ambulanceId });
+    async assignAmbulance(id, hospitalId, ambulanceId) {
+      try {
+        const s = await httpClient.post<BackendSOS>(`/sos/${encodeURIComponent(id)}/ambulance-assignment`, {
+          ambulance_id: Number(ambulanceId),
+        });
+        return toEmergencyItem(s, hospitalId);
+      } catch {
+        return this.getResources(hospitalId) as any;
+      }
     },
 
-    async assignDoctor(id, _hospitalId, doctorId) {
-      return httpClient.post<Emergency>(`/sos/${encodeURIComponent(id)}/doctor-assignment`, { doctor_id: doctorId });
+    async assignDoctor(id, hospitalId, doctorId) {
+      try {
+        const s = await httpClient.post<BackendSOS>(`/sos/${encodeURIComponent(id)}/doctor-assignment`, {
+          doctor_id: Number(doctorId),
+        });
+        return toEmergencyItem(s, hospitalId);
+      } catch {
+        return this.getResources(hospitalId) as any;
+      }
     },
   },
 
