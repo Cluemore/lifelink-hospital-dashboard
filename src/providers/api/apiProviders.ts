@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AuthSession,
   Emergency,
   EmergencyStatus,
@@ -23,11 +23,12 @@ const API_SESSION_KEY = 'lifelink-api-session-hospital-v1';
 const LOCAL_DOCTORS_KEY = 'lifelink-local-doctors-v1';
 const LOCAL_AMBULANCES_KEY = 'lifelink-local-ambulances-v1';
 
-// ── Backend response shapes ───────────────────────────────────────────────────
+// â”€â”€ Backend response shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface LoginResponse {
   access_token: string;
   token_type: string;
+  hospital?: BackendHospital;
 }
 
 interface BackendHospital {
@@ -88,7 +89,7 @@ interface BackendSOS {
   doctor?: BackendDoctor;
 }
 
-// ── Demo hospital email → hospital name mapping ───────────────────────────────
+// â”€â”€ Demo hospital email â†’ hospital name mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DEMO_EMAIL_MAP: Record<string, string> = {
   'citycare@lifelink.demo': 'CityCare Hospital',
   'metro@lifelink.demo': 'Metro General Hospital',
@@ -96,7 +97,7 @@ const DEMO_EMAIL_MAP: Record<string, string> = {
   'harbourview@lifelink.demo': 'Harbourview Emergency Hospital',
 };
 
-// ── Local storage helpers for doctors/ambulances fallback ─────────────────────
+// â”€â”€ Local storage helpers for doctors/ambulances fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getLocalStore<T>(key: string): Record<string, T[]> {
   if (typeof window === 'undefined') return {};
@@ -125,7 +126,7 @@ function saveLocalHospitalItems<T>(key: string, hospitalId: string, items: T[]) 
   setLocalStore(key, store);
 }
 
-// ── Mapper: backend hospital row → dashboard Hospital type ────────────────────
+// â”€â”€ Mapper: backend hospital row â†’ dashboard Hospital type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function toHospital(h: BackendHospital): Hospital {
   const generalTotal = h.total_beds ?? 100;
@@ -174,7 +175,7 @@ const FALLBACK_HOSPITAL: Hospital = {
   status: 'CONNECTED',
 };
 
-// ── Session helpers ───────────────────────────────────────────────────────────
+// â”€â”€ Session helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function storedApiSession(): AuthSession | null {
   if (typeof window === 'undefined') return null;
@@ -203,7 +204,7 @@ function forgetHospital() {
   } catch { /* ignore */ }
 }
 
-// ── Hospital fetch helpers ────────────────────────────────────────────────────
+// â”€â”€ Hospital fetch helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function fetchAllHospitals(): Promise<BackendHospital[]> {
   try {
@@ -238,7 +239,7 @@ async function fetchHospitalForEmail(email: string): Promise<Hospital> {
   return toHospital(all[0]);
 }
 
-// ── Emergency mapper ──────────────────────────────────────────────────────────
+// â”€â”€ Emergency mapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function toEmergencyItem(s: BackendSOS, hospitalId: string): Emergency {
   const isAccepted = s.status === 'ACCEPTED' || s.status === 'IN_PROGRESS' || s.dispatch_status === 'ACCEPTED' || s.dispatch_status === 'AMBULANCE_ASSIGNED' || s.dispatch_status === 'EN_ROUTE';
@@ -331,7 +332,7 @@ function toEmergencyItem(s: BackendSOS, hospitalId: string): Emergency {
   };
 }
 
-// ── Doctors & Ambulances API with graceful sync ───────────────────────────────
+// â”€â”€ Doctors & Ambulances API with graceful sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function fetchDoctorsFromBackend(hospitalId: string): Promise<Doctor[]> {
   try {
@@ -378,7 +379,7 @@ async function fetchAmbulancesFromBackend(hospitalId: string): Promise<Ambulance
   return getLocalHospitalItems<Ambulance>(LOCAL_AMBULANCES_KEY, hospitalId);
 }
 
-// ── Provider set ──────────────────────────────────────────────────────────────
+// â”€â”€ Provider set â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const apiProviders: ProviderSet = {
   auth: {
@@ -885,3 +886,4 @@ export const apiProviders: ProviderSet = {
     },
   },
 };
+
