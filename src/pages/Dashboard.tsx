@@ -32,7 +32,22 @@ export function Dashboard() {
       if (!active) return;
       setStats({...statsData, availableGeneralBeds: resources.beds.general.available, totalGeneralBeds: resources.beds.general.total, availableEmergencyDoctors: resources.doctors.filter(d=>d.status === "AVAILABLE" && /emergency/i.test(`${d.department} ${d.specialization}`)).length, availableAmbulances: resources.ambulances.filter(a=>a.status==='AVAILABLE').length, totalAmbulances: resources.ambulances.length, availableDoctors: resources.doctors.filter(d=>d.status==='AVAILABLE').length, totalDoctors: resources.doctors.length, availableBeds: resources.beds.emergency.available, totalBeds: resources.beds.emergency.total, availableIcuBeds: resources.beds.icu.available, totalIcuBeds: resources.beds.icu.total}); setNewCases(newData); setOngoingCases(ongoingData); setActivity(activityData);
     }).catch((caught: unknown) => { if(active) setError(caught instanceof Error ? caught.message : 'Please check the LifeLink backend connection.'); });
-    return () => { active = false; };
+
+    const pollInterval = setInterval(() => {
+      Promise.all([
+        emergencyApi.getNew(currentHospital.id),
+        emergencyApi.getOngoing(currentHospital.id),
+      ]).then(([newData, ongoingData]) => {
+        if (!active) return;
+        setNewCases(newData);
+        setOngoingCases(ongoingData);
+      }).catch(() => {});
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(pollInterval);
+    };
   }, [currentHospital, reloadKey]);
 
   if (error) return <div className="page"><ErrorState message={error} onRetry={() => setReloadKey((value) => value + 1)} /></div>;
@@ -50,9 +65,9 @@ export function Dashboard() {
 
     </section>
     <section className="metric-grid metric-grid--five" aria-label="Hospital metrics">
-      <MetricCard label="New emergencies" value={stats.newEmergencies.toString().padStart(2, '0')} detail="Awaiting hospital decision" icon={Inbox} />
-      <MetricCard label="Ongoing cases" value={stats.ongoingCases.toString().padStart(2, '0')} detail="Active hospital responses" icon={RadioTower} tone="ivory" />
-      <MetricCard label="Critical active" value={stats.criticalCases.toString().padStart(2, '0')} detail="Immediate attention required" icon={Siren} tone="critical" />
+      <MetricCard label="New emergencies" value={newCases.length.toString().padStart(2, '0')} detail="Awaiting hospital decision" icon={Inbox} />
+      <MetricCard label="Ongoing cases" value={ongoingCases.length.toString().padStart(2, '0')} detail="Active hospital responses" icon={RadioTower} tone="ivory" />
+      <MetricCard label="Critical active" value={(newCases.filter(e => e.priority.level === 'CRITICAL').length + ongoingCases.filter(e => e.priority.level === 'CRITICAL').length).toString().padStart(2, '0')} detail="Immediate attention required" icon={Siren} tone="critical" />
       <MetricCard label="Available ambulances" value={`${stats.availableAmbulances} / ${stats.totalAmbulances}`} detail="Hospital fleet ready" icon={Ambulance} />
       <MetricCard label="Response time" value={`${stats.averageResponseTimeMinutes} min`} detail="Current prototype average" icon={Clock3} />
     </section>
