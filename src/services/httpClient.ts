@@ -1,4 +1,4 @@
-import { runtimeConfig } from '../config/runtime';
+﻿import { runtimeConfig } from '../config/runtime';
 import type { ApiErrorPayload } from '../types';
 import { tokenStore } from './tokenStore';
 
@@ -31,8 +31,8 @@ async function responseBody(response: Response): Promise<unknown> {
   try { return await response.json(); } catch { return undefined; }
 }
 
-// Login paths — a 401 on these means wrong credentials, NOT session expired.
-const LOGIN_PATHS = ['/users/login', '/auth/login', '/auth/hospital/login'];
+// Login paths â€” a 401 on these means wrong credentials, NOT session expired.
+const LOGIN_PATHS = ['/users/login', '/auth/login', '/auth/hospital/login', '/hospitals/login'];
 
 export const httpClient = {
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -93,3 +93,4 @@ export const httpClient = {
   post<T>(path: string, body?: unknown) { return this.request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }); },
   patch<T>(path: string, body: unknown) { return this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }); },
 };
+

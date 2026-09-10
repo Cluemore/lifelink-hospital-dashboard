@@ -1,4 +1,4 @@
-import { ChevronDown, Eye, EyeOff, HeartPulse, LockKeyhole, Network } from 'lucide-react';
+﻿import { ChevronDown, Eye, EyeOff, HeartPulse, LockKeyhole, Network } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -44,8 +44,8 @@ export function Login() {
           {error && <div className="login-error" role="alert">{error}</div>}
           <label>Email<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="hospital@lifelink.demo" required /></label>
           <label>Password<div className="password-field"><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter demo password" required /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
-          <button className="button button--primary button--full login-submit" disabled={loading}>{loading ? 'Connecting hospital…' : 'Sign in'}<LockKeyhole size={15} /></button>
-          <small className="login-note">Mock authentication · no real patient or hospital systems are connected.</small>
+          <button className="button button--primary button--full login-submit" disabled={loading}>{loading ? 'Connecting hospitalâ€¦' : 'Sign in'}<LockKeyhole size={15} /></button>
+          <small className="login-note">Secured with JWT &middot; Hospital credentials verified against LifeLink database.</small>
           <Link className="text-link" to="/signup">New hospital? Join LifeLink</Link>
         </form>
         <details className="demo-accounts"><summary><span>Demo hospital accounts</span><ChevronDown size={16} /></summary><div className="demo-account-list">{hospitalAccounts.map((account) => { const hospital = hospitals.find((item) => item.id === account.hospitalId)!; return <button type="button" key={account.hospitalId} onClick={() => setEmail(account.email)}><span><strong>{hospital.name}</strong><small>{account.email}</small></span><em>{hospital.id}</em></button>; })}<p>Selecting an account fills its email. Passwords are listed in the README.</p></div></details>
@@ -53,3 +53,4 @@ export function Login() {
     </section>
   </div>;
 }
+
