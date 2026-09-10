@@ -384,28 +384,23 @@ async function fetchAmbulancesFromBackend(hospitalId: string): Promise<Ambulance
 export const apiProviders: ProviderSet = {
   auth: {
     async register(payload: HospitalRegistrationInput): Promise<HospitalRegistration> {
-      // 1. Create Admin User account in database
-      await httpClient.post('/users/', {
-        full_name: payload.adminName,
-        email: payload.adminEmail,
-        phone_number: payload.adminPhone,
-        password: payload.password,
-      });
-
-      // 2. Create Hospital record in database
+      // 1. Create Hospital record directly in the hospitals table
+      // Email (e.g. Gmail) and password are saved directly in hospitals table (users table is kept clean for app patients)
       const fullAddress = [payload.address, payload.city, payload.state, payload.pinCode]
         .filter(Boolean)
         .join(', ');
 
       const createdHospital = await httpClient.post<BackendHospital>('/hospitals/', {
         name: payload.hospitalName,
+        email: payload.adminEmail,
+        password: payload.password,
         address: fullAddress,
-        latitude: payload.latitude ?? 19.7,
-        longitude: payload.longitude ?? 72.77,
+        latitude: payload.latitude ?? 19.697,
+        longitude: payload.longitude ?? 72.766,
         total_beds: payload.generalBeds,
         icu_beds: payload.icuBeds,
         oxygen_beds: payload.emergencyBeds,
-        phone_number: payload.emergencyPhone,
+        phone_number: payload.emergencyPhone || payload.adminPhone,
         rating: 5.0,
       });
 

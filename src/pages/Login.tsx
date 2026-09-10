@@ -1,8 +1,7 @@
-﻿import { ChevronDown, Eye, EyeOff, HeartPulse, LockKeyhole, Network } from 'lucide-react';
+﻿import { Eye, EyeOff, HeartPulse, LockKeyhole, Network } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { hospitalAccounts, hospitals } from '../data/mockData';
 
 export function Login() {
   const { currentHospital, login } = useAuth();
@@ -40,15 +39,15 @@ export function Login() {
     <section className="login-form-panel">
       <div className="login-form-wrap">
         <form className="login-form" onSubmit={submit}>
-          <span className="eyebrow">Authorized partner access</span><h2>Hospital login</h2><p>Sign in with a LifeLink demo hospital account.</p>
+          <span className="eyebrow">Authorized partner access</span><h2>Hospital login</h2><p>Sign in to your hospital operational portal.</p>
           {error && <div className="login-error" role="alert">{error}</div>}
-          <label>Email<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="hospital@lifelink.demo" required /></label>
-          <label>Password<div className="password-field"><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter demo password" required /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
+          <label>Email<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="hospital@gmail.com or official email" required /></label>
+          <label>Password<div className="password-field"><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
           <button className="button button--primary button--full login-submit" disabled={loading}>{loading ? 'Connecting hospitalâ€¦' : 'Sign in'}<LockKeyhole size={15} /></button>
           <small className="login-note">Secured with JWT &middot; Hospital credentials verified against LifeLink database.</small>
           <Link className="text-link" to="/signup">New hospital? Join LifeLink</Link>
         </form>
-        <details className="demo-accounts"><summary><span>Demo hospital accounts</span><ChevronDown size={16} /></summary><div className="demo-account-list">{hospitalAccounts.map((account) => { const hospital = hospitals.find((item) => item.id === account.hospitalId)!; return <button type="button" key={account.hospitalId} onClick={() => setEmail(account.email)}><span><strong>{hospital.name}</strong><small>{account.email}</small></span><em>{hospital.id}</em></button>; })}<p>Selecting an account fills its email. Passwords are listed in the README.</p></div></details>
+        
       </div>
     </section>
   </div>;
