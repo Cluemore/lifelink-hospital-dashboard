@@ -85,7 +85,7 @@ export function EmergencyDetails() {
   const statusMessages: Partial<Record<EmergencyStatus, string>> = { EN_ROUTE: 'Ambulance is now en route', PATIENT_PICKED_UP: 'Patient pickup confirmed · route updated toward hospital', ARRIVED: 'Patient arrived at hospital', COMPLETED: 'Emergency case completed · resources released' };
   const advanceStatus = async (status: EmergencyStatus) => {
     const succeeded = await runAction(() => emergencyApi.updateStatus(emergency.id, hospitalId, status), statusMessages[status] ?? `Case updated to ${status.replaceAll('_', ' ').toLowerCase()}`);
-    if (succeeded && status === 'COMPLETED') window.setTimeout(() => navigate('/ongoing-cases'), 1200);
+    if (succeeded && status === 'COMPLETED') window.setTimeout(() => navigate('/completed-cases'), 1200);
   };
 
   return <div className="page detail-page">

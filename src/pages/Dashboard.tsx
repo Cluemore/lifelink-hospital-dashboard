@@ -19,6 +19,7 @@ export function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [newCases, setNewCases] = useState<Emergency[]>([]);
   const [ongoingCases, setOngoingCases] = useState<Emergency[]>([]);
+  const [completedCases, setCompletedCases] = useState<Emergency[]>([]);
   const [activity, setActivity] = useState<ActivityPoint[]>([]);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
@@ -37,10 +38,12 @@ export function Dashboard() {
       Promise.all([
         emergencyApi.getNew(currentHospital.id),
         emergencyApi.getOngoing(currentHospital.id),
-      ]).then(([newData, ongoingData]) => {
+        emergencyApi.getCompleted(currentHospital.id),
+      ]).then(([newData, ongoingData, compData]) => {
         if (!active) return;
         setNewCases(newData);
         setOngoingCases(ongoingData);
+        setCompletedCases(compData);
       }).catch(() => {});
     }, 3000);
 
@@ -60,6 +63,7 @@ export function Dashboard() {
         <div className="section-heading"><div><span className="eyebrow">Priority dispatch board</span><h2>New Emergencies {newCases.length > 0 && <span className="attention-dot attention-dot--high" aria-hidden="true"/>} · {newCases.length}</h2></div><span>{newCases.filter(e=>e.priority.level === "CRITICAL").length} critical pending · {newCases.length} decisions needed</span></div>
         <div className="dashboard-queue-block"><div className="dashboard-queue-label"><Inbox size={15} /><span><strong>New request</strong>Requires decision</span></div>{newCases.length ? newCases.slice(0,3).map(emergency => <EmergencyPreviewCard key={emergency.id} emergency={emergency} />) : <EmptyState title="No new requests" message="The incoming queue is currently clear." />}</div>
         <Link className="text-link" to="/new-emergencies">View all new emergencies →</Link>
+        <Link className="text-link" to="/completed-cases" style={{ color: "#10b981" }}>View completed cases archive ({completedCases.length}) →</Link>
         <div className="dashboard-queue-block dashboard-queue-block--ongoing"><div className="dashboard-queue-label"><Activity size={15} /><span><strong>Ongoing response</strong>Active operation</span></div>{ongoingCases[0] ? <OngoingCaseCard emergency={ongoingCases[0]} /> : <EmptyState title="No ongoing cases" message="Accepted cases will appear here." />}</div>
       </div>
 

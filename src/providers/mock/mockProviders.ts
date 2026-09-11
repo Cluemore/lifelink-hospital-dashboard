@@ -93,8 +93,8 @@ export const mockProviders: ProviderSet = {
         name: safe.hospitalName.trim(),
         shortName: safe.hospitalName.trim(),
         department: 'Emergency Department',
-        latitude: safe.latitude ?? 19.076,
-        longitude: safe.longitude ?? 72.8777,
+        latitude: safe.latitude ?? 19.697,
+        longitude: safe.longitude ?? 72.766,
         address: safe.address.trim(),
         area: safe.city.trim(),
         city: safe.city.trim(),
@@ -191,6 +191,11 @@ export const mockProviders: ProviderSet = {
       await delay();
       return cloneValue(sortOperational(getMockState().emergencies.filter((item) => item.hospitalId === hospitalId && item.requestStatus === 'PENDING')));
     },
+    async getCompleted(hospitalId) { assertHospital(hospitalId);
+      await delay();
+      return cloneValue(sortOperational(getMockState().emergencies.filter((item) => item.hospitalId === hospitalId && item.status === 'COMPLETED')));
+    },
+
     async getOngoing(hospitalId) { assertHospital(hospitalId);
       await delay();
       return cloneValue(sortOperational(getMockState().emergencies.filter((item) => item.hospitalId === hospitalId && item.requestStatus === 'ACCEPTED' && ongoingStatuses.includes(item.status))));

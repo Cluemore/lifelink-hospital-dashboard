@@ -8,6 +8,7 @@ function sortOperational<T extends { priority: { score: number }; createdAt: str
 export const emergencyService = {
   getNew: providers.emergency.getNew.bind(providers.emergency),
   getOngoing: providers.emergency.getOngoing.bind(providers.emergency),
+  getCompleted: providers.emergency.getCompleted.bind(providers.emergency),
   getById: providers.emergency.getById.bind(providers.emergency),
   accept: providers.emergency.accept.bind(providers.emergency),
   reject: providers.emergency.reject.bind(providers.emergency),

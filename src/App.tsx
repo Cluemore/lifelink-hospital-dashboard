@@ -8,6 +8,7 @@ import { NewEmergencies } from './pages/NewEmergencies';
 import { OngoingCases } from './pages/OngoingCases';
 import { HospitalRegistration } from './pages/HospitalRegistration';
 import { Resources } from './pages/Resources';
+import { CompletedCases } from './pages/CompletedCases';
 
 export default function App() {
   return <Routes>
@@ -18,6 +19,7 @@ export default function App() {
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="new-emergencies" element={<NewEmergencies />} />
       <Route path="ongoing-cases" element={<OngoingCases />} />
+      <Route path="completed-cases" element={<CompletedCases />} />
       <Route path="cases/:id" element={<EmergencyDetails />} />
       <Route path="emergencies/:id" element={<EmergencyDetails />} />
       <Route path="resources" element={<Resources />} />

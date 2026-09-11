@@ -1,4 +1,4 @@
-import { Ambulance, Inbox, LayoutDashboard, LogOut, RadioTower, RotateCcw } from 'lucide-react';
+import { Ambulance, CheckCircle2, Inbox, LayoutDashboard, LogOut, RadioTower, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -12,20 +12,21 @@ const navItems = [
   { to: '/dashboard', label: 'Overview', index: '01', icon: LayoutDashboard },
   { to: '/new-emergencies', label: 'New Emergencies', index: '02', icon: Inbox },
   { to: '/ongoing-cases', label: 'Ongoing Cases', index: '03', icon: RadioTower },
-  { to: '/resources', label: 'Resources', index: '04', icon: Ambulance },
+  { to: '/completed-cases', label: 'Completed Cases', index: '04', icon: CheckCircle2 },
+  { to: '/resources', label: 'Resources', index: '05', icon: Ambulance },
 ];
 
 export function Sidebar() {
   const { currentHospital, logout } = useAuth();
   const navigate = useNavigate();
   const [resetOpen,setResetOpen] = useState(false);
-  const [counts, setCounts] = useState({ newCases: 0, ongoing: 0 });
+  const [counts, setCounts] = useState({ newCases: 0, ongoing: 0, completed: 0 });
 
   useEffect(() => {
     if (!currentHospital) return;
-    const load = () => Promise.all([emergencyApi.getNew(currentHospital.id), emergencyApi.getOngoing(currentHospital.id)]).then(([newCases, ongoing]) => setCounts({ newCases: newCases.length, ongoing: ongoing.length }));
-    void load().catch(() => setCounts({newCases:0,ongoing:0}));
-    const refresh = () => { void load().catch(() => setCounts({newCases:0,ongoing:0})); };
+    const load = () => Promise.all([emergencyApi.getNew(currentHospital.id), emergencyApi.getOngoing(currentHospital.id), emergencyApi.getCompleted(currentHospital.id)]).then(([newCases, ongoing, comp]) => setCounts({ newCases: newCases.length, ongoing: ongoing.length, completed: comp.length }));
+    void load().catch(() => setCounts({newCases:0,ongoing:0,completed:0}));
+    const refresh = () => { void load().catch(() => setCounts({newCases:0,ongoing:0,completed:0})); };
     window.addEventListener(DATA_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(DATA_CHANGED_EVENT, refresh);
   }, [currentHospital]);
@@ -46,7 +47,7 @@ export function Sidebar() {
     <div>
       <NavLink to="/dashboard" className="brand"><span className="brand__mark">L+</span><span><strong>LifeLink AI+</strong><small>Hospital Network</small></span></NavLink>
       <nav className="sidebar__nav" aria-label="Primary navigation">
-        {navItems.map(({ to, label, index, icon: Icon }) => <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`}><span className="nav-item__index">{index}</span><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{label === 'New Emergencies' && <span className="nav-item__count">{counts.newCases > 0 && <i className="attention-dot attention-dot--high" aria-hidden="true"/>}{counts.newCases}</span>}{label === 'Ongoing Cases' && counts.ongoing > 0 && <span className="nav-item__count nav-item__count--teal">{counts.ongoing}</span>}</NavLink>)}
+        {navItems.map(({ to, label, index, icon: Icon }) => <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`}><span className="nav-item__index">{index}</span><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{label === 'New Emergencies' && <span className="nav-item__count">{counts.newCases > 0 && <i className="attention-dot attention-dot--high" aria-hidden="true"/>}{counts.newCases}</span>}{label === 'Ongoing Cases' && counts.ongoing > 0 && <span className="nav-item__count nav-item__count--teal">{counts.ongoing}</span>}{label === 'Completed Cases' && counts.completed > 0 && <span className="nav-item__count" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}>{counts.completed}</span>}</NavLink>)}
       </nav>
     </div>
     <div className="sidebar__footer">

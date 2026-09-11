@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { RadioTower, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { OngoingCaseCard } from '../components/emergencies/OngoingCaseCard';
@@ -7,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { emergencyApi } from '../services/api';
 import type { Emergency, EmergencyStatus } from '../types';
 
-const statusFilters: Array<'ALL' | EmergencyStatus> = ['ALL', 'ACCEPTED', 'AMBULANCE_ASSIGNED', 'EN_ROUTE', 'PATIENT_PICKED_UP', 'ARRIVED'];
+const statusFilters: Array<'ALL' | EmergencyStatus> = ['ALL', 'ACCEPTED', 'AMBULANCE_ASSIGNED', 'EN_ROUTE', 'PATIENT_PICKED_UP', 'ARRIVED', 'COMPLETED'];
 
 export function OngoingCases() {
   const { currentHospital } = useAuth();
@@ -23,11 +24,17 @@ export function OngoingCases() {
     let active = true;
 
     const fetchItems = () => {
-      emergencyApi
-        .getOngoing(currentHospital.id)
-        .then((data) => {
+      Promise.all([
+        emergencyApi.getOngoing(currentHospital.id),
+        emergencyApi.getCompleted(currentHospital.id),
+      ])
+        .then(([ongoingData, completedData]) => {
           if (active) {
-            setItems(data);
+            const map = new Map<string, Emergency>();
+            for (const item of [...ongoingData, ...completedData]) {
+              map.set(item.id, item);
+            }
+            setItems(Array.from(map.values()).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)));
             setLoading(false);
           }
         })
@@ -55,7 +62,7 @@ export function OngoingCases() {
   }), [items, filter, query]);
 
   return <div className="page ongoing-page">
-    <header className="page-header page-header--compact"><div><span className="eyebrow">Active operations · in progress</span><h1>Ongoing Cases</h1><p>Accepted responses currently coordinated by {currentHospital?.name}.</p></div><div className="queue-summary queue-summary--active"><RadioTower size={18} /><strong>{items.length}</strong><span>Active response{items.length === 1 ? '' : 's'}</span></div></header>
+    <header className="page-header page-header--compact"><div><span className="eyebrow">Active operations · in progress</span><h1>Ongoing Cases</h1><p>Accepted responses currently coordinated by {currentHospital?.name}.</p></div><div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}><Link to="/completed-cases" className="button button--secondary" style={{ fontSize: '0.8rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}>View Completed Cases →</Link><div className="queue-summary queue-summary--active"><RadioTower size={18} /><strong>{items.length}</strong><span>Active response{items.length === 1 ? '' : 's'}</span></div></div></header>
     <div className="queue-toolbar"><label className="search-box"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search case, resource or area…" aria-label="Search ongoing cases" /></label><div className="filter-tabs status-filter-tabs">{statusFilters.map((item) => <button key={item} className={filter === item ? 'is-active' : ''} onClick={() => setFilter(item)}>{item === 'ALL' ? 'All' : item.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</button>)}</div></div>
     {loading ? <div className="loading-state">Loading active responses…</div> : error ? <ErrorState message={error} onRetry={() => setReloadKey((value) => value + 1)} /> : filtered.length ? <div className="ongoing-grid">{filtered.map((item) => <OngoingCaseCard key={item.id} emergency={item} />)}</div> : <EmptyState title={items.length ? 'No matching active cases' : 'No active response cases'} message={items.length ? 'Try another status or search term.' : 'Accepted emergencies will appear here.'} />}
   </div>;

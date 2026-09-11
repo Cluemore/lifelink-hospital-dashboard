@@ -16,6 +16,7 @@ export interface HospitalProvider {
 export interface EmergencyProvider {
   getNew(hospitalId: HospitalId): Promise<Emergency[]>;
   getOngoing(hospitalId: HospitalId): Promise<Emergency[]>;
+  getCompleted(hospitalId: HospitalId): Promise<Emergency[]>;
   getById(id: string, hospitalId: HospitalId): Promise<Emergency | null>;
   accept(id: string, hospitalId: HospitalId): Promise<Emergency>;
   reject(id: string, hospitalId: HospitalId, reason: string): Promise<Emergency>;

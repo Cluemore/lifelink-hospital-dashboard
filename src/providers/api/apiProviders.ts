@@ -1,4 +1,4 @@
-﻿import type {
+import type { AmbulanceStatus, DoctorStatus,
   AuthSession,
   Emergency,
   EmergencyStatus,
@@ -14,6 +14,7 @@
   AmbulanceInput,
 } from '../../types';
 import { httpClient } from '../../services/httpClient';
+import { DATA_CHANGED_EVENT } from '../../services/mockStore';
 import { toApiHospitalStatus } from '../../services/statusMapper';
 import { tokenStore } from '../../services/tokenStore';
 import type { ProviderSet } from '../contracts';
@@ -23,7 +24,7 @@ const API_SESSION_KEY = 'lifelink-api-session-hospital-v1';
 const LOCAL_DOCTORS_KEY = 'lifelink-local-doctors-v1';
 const LOCAL_AMBULANCES_KEY = 'lifelink-local-ambulances-v1';
 
-// â”€â”€ Backend response shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Backend response shapes ───────────────────────────────────────────────────
 
 interface LoginResponse {
   access_token: string;
@@ -89,7 +90,7 @@ interface BackendSOS {
   doctor?: BackendDoctor;
 }
 
-// â”€â”€ Demo hospital email â†’ hospital name mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Demo hospital email → hospital name mapping ───────────────────────────────
 const DEMO_EMAIL_MAP: Record<string, string> = {
   'citycare@lifelink.demo': 'CityCare Hospital',
   'metro@lifelink.demo': 'Metro General Hospital',
@@ -97,7 +98,7 @@ const DEMO_EMAIL_MAP: Record<string, string> = {
   'harbourview@lifelink.demo': 'Harbourview Emergency Hospital',
 };
 
-// â”€â”€ Local storage helpers for doctors/ambulances fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Local storage helpers for doctors/ambulances fallback ─────────────────────
 
 function getLocalStore<T>(key: string): Record<string, T[]> {
   if (typeof window === 'undefined') return {};
@@ -126,7 +127,7 @@ function saveLocalHospitalItems<T>(key: string, hospitalId: string, items: T[]) 
   setLocalStore(key, store);
 }
 
-// â”€â”€ Mapper: backend hospital row â†’ dashboard Hospital type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Mapper: backend hospital row → dashboard Hospital type ────────────────────
 
 function toHospital(h: BackendHospital): Hospital {
   const generalTotal = h.total_beds ?? 100;
@@ -159,23 +160,23 @@ function toHospital(h: BackendHospital): Hospital {
 }
 
 const FALLBACK_HOSPITAL: Hospital = {
-  id: '5',
-  name: 'CityCare Hospital',
-  shortName: 'CityCare',
-  networkRegion: 'India',
+  id: '16',
+  name: 'Anand Hospital & Critical Care',
+  shortName: 'Anand Hospital',
+  networkRegion: 'Palghar District',
   department: 'Emergency',
-  address: '123 City Centre, Mumbai, MH 400001',
-  latitude: 19.076,
-  longitude: 72.8777,
-  emergencyBeds: { available: 130, total: 200 },
-  icuBeds: { available: 30, total: 40 },
-  averageResponseTimeMinutes: 8,
+  address: 'Mahim Road, Opp. ST Stand, Palghar West, Maharashtra 401404',
+  latitude: 19.699,
+  longitude: 72.771,
+  emergencyBeds: { available: 10, total: 15 },
+  icuBeds: { available: 5, total: 8 },
+  averageResponseTimeMinutes: 5,
   completedToday: 0,
   acceptanceRate: 0.95,
   status: 'CONNECTED',
 };
 
-// â”€â”€ Session helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Session helpers ───────────────────────────────────────────────────────────
 
 function storedApiSession(): AuthSession | null {
   if (typeof window === 'undefined') return null;
@@ -204,7 +205,7 @@ function forgetHospital() {
   } catch { /* ignore */ }
 }
 
-// â”€â”€ Hospital fetch helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Hospital fetch helpers ────────────────────────────────────────────────────
 
 async function fetchAllHospitals(): Promise<BackendHospital[]> {
   try {
@@ -239,12 +240,13 @@ async function fetchHospitalForEmail(email: string): Promise<Hospital> {
   return toHospital(all[0]);
 }
 
-// â”€â”€ Emergency mapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Emergency mapper ──────────────────────────────────────────────────────────
 
 function toEmergencyItem(s: BackendSOS, hospitalId: string): Emergency {
-  const isAccepted = s.status === 'ACCEPTED' || s.status === 'IN_PROGRESS' || s.dispatch_status === 'ACCEPTED' || s.dispatch_status === 'AMBULANCE_ASSIGNED' || s.dispatch_status === 'EN_ROUTE';
-  const statusRaw = (s.dispatch_status || (isAccepted ? 'ACCEPTED' : 'RECEIVED')) as EmergencyStatus;
-
+  const isCompleted = s.status === 'RESOLVED' || s.dispatch_status === 'COMPLETED' || s.dispatch_status === 'completed';
+  const isAccepted = s.status === 'ACCEPTED' || s.status === 'IN_PROGRESS' || s.dispatch_status === 'ACCEPTED' || s.dispatch_status === 'AMBULANCE_ASSIGNED' || s.dispatch_status === 'EN_ROUTE' || isCompleted;
+  const statusRaw = (isCompleted ? 'COMPLETED' : (s.dispatch_status || (isAccepted ? 'ACCEPTED' : 'RECEIVED'))) as EmergencyStatus;
+  
   let assignedAmb: Ambulance | undefined;
   if (s.ambulance) {
     assignedAmb = {
@@ -299,11 +301,11 @@ function toEmergencyItem(s: BackendSOS, hospitalId: string): Emergency {
       name: s.patient_name || `User #${s.user_id}`,
     },
     location: {
-      latitude: s.latitude ?? 19.7,
-      longitude: s.longitude ?? 72.77,
+      latitude: s.latitude ?? 19.697,
+      longitude: s.longitude ?? 72.766,
       address: s.description || 'Live GPS Location Broadcasted',
-      area: 'Mumbai Metro Emergency Zone',
-      city: 'Mumbai',
+      area: 'Palghar District Emergency Zone',
+      city: 'Palghar',
     },
     createdAt: s.created_at ?? new Date().toISOString(),
     assignedAmbulance: assignedAmb,
@@ -332,54 +334,107 @@ function toEmergencyItem(s: BackendSOS, hospitalId: string): Emergency {
   };
 }
 
-// â”€â”€ Doctors & Ambulances API with graceful sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Doctors & Ambulances API with graceful sync ───────────────────────────────
 
 async function fetchDoctorsFromBackend(hospitalId: string): Promise<Doctor[]> {
   try {
-    const res = await httpClient.get<BackendDoctor[]>(`/hospitals/${encodeURIComponent(hospitalId)}/doctors/`);
+    const [res, activeSosList] = await Promise.all([
+      httpClient.get<BackendDoctor[]>(`/hospitals/${encodeURIComponent(hospitalId)}/doctors/`),
+      httpClient.get<BackendSOS[]>('/sos/').catch(() => [] as BackendSOS[]),
+    ]);
+
     if (Array.isArray(res)) {
-      const docs: Doctor[] = res.map((d) => ({
-        id: String(d.doctor_id),
-        hospitalId,
-        name: d.name,
-        department: d.department ?? 'Emergency',
-        specialization: d.specialization ?? 'General Physician',
-        phone: d.phone,
-        status: (d.status as any) ?? 'AVAILABLE',
-        currentCases: d.current_cases ?? 0,
-      }));
+      // Find all doctors who actually have an ongoing (non-completed) emergency
+      const activeDoctorCaseCounts = new Map<string, number>();
+      if (Array.isArray(activeSosList)) {
+        for (const sos of activeSosList) {
+          if (sos.status !== 'RESOLVED' && sos.dispatch_status !== 'COMPLETED' && sos.assigned_doctor_id) {
+            const docId = String(sos.assigned_doctor_id);
+            activeDoctorCaseCounts.set(docId, (activeDoctorCaseCounts.get(docId) || 0) + 1);
+          }
+        }
+      }
+
+      const docs: Doctor[] = res.map((d) => {
+        const docId = String(d.doctor_id);
+        const actualActiveCases = activeDoctorCaseCounts.get(docId) || 0;
+        const effectiveStatus: DoctorStatus = actualActiveCases >= 3 ? 'BUSY' : 'AVAILABLE';
+
+        // Auto-heal backend if doctor workload is out of sync
+        if (d.current_cases !== actualActiveCases || d.status !== effectiveStatus) {
+          httpClient.request(`/hospitals/${encodeURIComponent(hospitalId)}/doctors/${encodeURIComponent(docId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ current_cases: actualActiveCases, status: effectiveStatus }),
+          }).catch(() => {});
+        }
+
+        return {
+          id: docId,
+          hospitalId,
+          name: d.name,
+          department: d.department ?? 'Emergency',
+          specialization: d.specialization ?? 'General Physician',
+          phone: d.phone,
+          status: effectiveStatus,
+          currentCases: actualActiveCases,
+        };
+      });
+
       saveLocalHospitalItems(LOCAL_DOCTORS_KEY, hospitalId, docs);
       return docs;
     }
-  } catch {
-    // Backend endpoint not deployed yet on remote, use local store
-  }
+  } catch {}
   return getLocalHospitalItems<Doctor>(LOCAL_DOCTORS_KEY, hospitalId);
 }
 
 async function fetchAmbulancesFromBackend(hospitalId: string): Promise<Ambulance[]> {
   try {
-    const res = await httpClient.get<BackendAmbulance[]>(`/hospitals/${encodeURIComponent(hospitalId)}/ambulances/`);
+    const [res, activeSosList] = await Promise.all([
+      httpClient.get<BackendAmbulance[]>(`/hospitals/${encodeURIComponent(hospitalId)}/ambulances/`),
+      httpClient.get<BackendSOS[]>('/sos/').catch(() => [] as BackendSOS[]),
+    ]);
+
     if (Array.isArray(res)) {
-      const ambs: Ambulance[] = res.map((a) => ({
-        id: String(a.ambulance_id),
-        hospitalId,
-        vehicleNumber: a.vehicle_number,
-        driverName: a.driver_name ?? '',
-        driverPhone: a.driver_phone ?? '',
-        locationLabel: a.location_label ?? 'Hospital Fleet',
-        status: (a.status as any) ?? 'AVAILABLE',
-      }));
+      // Find all ambulances ACTUALLY assigned to an active (non-resolved) SOS right now
+      const activelyAssignedAmbIds = new Set<string>();
+      if (Array.isArray(activeSosList)) {
+        for (const sos of activeSosList) {
+          if (sos.status !== 'RESOLVED' && sos.dispatch_status !== 'COMPLETED' && sos.assigned_ambulance_id) {
+            activelyAssignedAmbIds.add(String(sos.assigned_ambulance_id));
+          }
+        }
+      }
+
+      const ambs: Ambulance[] = res.map((a) => {
+        const ambId = String(a.ambulance_id);
+        const isActuallyInUse = activelyAssignedAmbIds.has(ambId);
+        const effectiveStatus: AmbulanceStatus = isActuallyInUse ? 'EN_ROUTE' : 'AVAILABLE';
+
+        // Auto-heal backend database if ambulance was left in EN_ROUTE after case was completed
+        if (a.status !== effectiveStatus) {
+          httpClient.request(`/hospitals/${encodeURIComponent(hospitalId)}/ambulances/${encodeURIComponent(ambId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: effectiveStatus }),
+          }).catch(() => {});
+        }
+
+        return {
+          id: ambId,
+          hospitalId,
+          vehicleNumber: a.vehicle_number,
+          driverName: a.driver_name ?? '',
+          driverPhone: a.driver_phone ?? '',
+          locationLabel: a.location_label ?? 'Hospital Fleet',
+          status: effectiveStatus,
+        };
+      });
+
       saveLocalHospitalItems(LOCAL_AMBULANCES_KEY, hospitalId, ambs);
       return ambs;
     }
-  } catch {
-    // Backend endpoint not deployed yet on remote, use local store
-  }
+  } catch {}
   return getLocalHospitalItems<Ambulance>(LOCAL_AMBULANCES_KEY, hospitalId);
 }
-
-// â”€â”€ Provider set â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const apiProviders: ProviderSet = {
   auth: {
@@ -547,11 +602,85 @@ export const apiProviders: ProviderSet = {
         const sos = await httpClient.get<BackendSOS[]>('/sos/');
         if (!Array.isArray(sos)) return [];
         return sos
-          .filter((s) => s.status === 'ACTIVE' || s.dispatch_status === 'RECEIVED')
+          .filter((s) => {
+          const ds = (s.dispatch_status || '').toUpperCase();
+          const st = (s.status || '').toUpperCase();
+          // Exclude rejected, accepted, in-progress, resolved, completed
+          if (ds === 'REJECTED' || st === 'REJECTED') return false;
+          if (st === 'ACCEPTED' || st === 'IN_PROGRESS' || st === 'RESOLVED') return false;
+          if (ds === 'COMPLETED' || ds === 'ACCEPTED' || ds === 'AMBULANCE_ASSIGNED' || ds === 'EN_ROUTE' || ds === 'ARRIVED' || ds === 'PATIENT_PICKED_UP') return false;
+          // Only show unhandled active/pending SOS
+          return st === 'ACTIVE' || ds === 'RECEIVED' || ds === '' || ds === 'PENDING';
+        })
           .map((s) => toEmergencyItem(s, hospitalId));
       } catch {
         return [];
       }
+    },
+
+    async getCompleted(hospitalId) {
+      const localKey = 'lifelink_completed_' + hospitalId;
+      let localItems: Emergency[] = [];
+      try {
+        const raw = localStorage.getItem(localKey);
+        if (raw) localItems = JSON.parse(raw);
+      } catch {}
+
+      let backendItems: Emergency[] = [];
+
+      // 1. Try dedicated endpoint first
+      try {
+        const sos = await httpClient.get<BackendSOS[]>('/sos/completed?hospital_id=' + encodeURIComponent(hospitalId));
+        if (Array.isArray(sos) && sos.length > 0) {
+          backendItems = sos.map((s) => toEmergencyItem(s, hospitalId));
+        }
+      } catch {}
+
+      // 2. If empty, probe recent SOS IDs (1 to 30) in parallel via /sos/{id}
+      if (backendItems.length === 0) {
+        try {
+          const probePromises: Promise<BackendSOS | null>[] = [];
+          for (let id = 1; id <= 30; id++) {
+            probePromises.push(
+              httpClient.get<BackendSOS>(`/sos/${id}`).catch(() => null)
+            );
+          }
+          const results = await Promise.allSettled(probePromises);
+          const allResolved: BackendSOS[] = [];
+          for (const res of results) {
+            if (res.status === 'fulfilled' && res.value) {
+              const s = res.value;
+              if (s.status === 'RESOLVED' || s.dispatch_status === 'COMPLETED' || s.dispatch_status === 'completed') {
+                allResolved.push(s);
+              }
+            }
+          }
+
+          // Filter by current hospital, or fallback to all resolved cases in network
+          const hospitalSpecific = allResolved.filter(
+            (s) => String(s.accepted_hospital_id) === String(hospitalId) || !s.accepted_hospital_id
+          );
+          const toUse = hospitalSpecific.length > 0 ? hospitalSpecific : allResolved;
+          backendItems = toUse.map((s) => toEmergencyItem(s, hospitalId));
+        } catch {}
+      }
+
+      // 3. Deduplicate and cache in localStorage
+      const map = new Map<string, Emergency>();
+      for (const item of [...backendItems, ...localItems]) {
+        map.set(item.id, item);
+      }
+      const combined = Array.from(map.values()).sort(
+        (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)
+      );
+
+      if (combined.length > 0) {
+        try {
+          localStorage.setItem(localKey, JSON.stringify(combined));
+        } catch {}
+      }
+
+      return combined;
     },
 
     async getOngoing(hospitalId) {
@@ -592,7 +721,7 @@ export const apiProviders: ProviderSet = {
           status: 'ACCEPTED',
           priority: { score: 95, level: 'CRITICAL', reasons: ['SOS Accepted'] },
           patient: { id: 'patient', name: 'Emergency Patient' },
-          location: { latitude: 19.7, longitude: 72.77, address: 'Emergency Location' },
+          location: { latitude: 19.697, longitude: 72.766, address: 'Emergency Location', area: 'Palghar District Emergency Zone', city: 'Palghar' },
           createdAt: new Date().toISOString(),
           timeline: [],
         };
@@ -615,7 +744,7 @@ export const apiProviders: ProviderSet = {
           status: 'REJECTED',
           priority: { score: 95, level: 'CRITICAL', reasons: ['Rejected'] },
           patient: { id: 'patient', name: 'Emergency Patient' },
-          location: { latitude: 19.7, longitude: 72.77, address: 'Emergency Location' },
+          location: { latitude: 19.697, longitude: 72.766, address: 'Emergency Location', area: 'Palghar District Emergency Zone', city: 'Palghar' },
           createdAt: new Date().toISOString(),
           timeline: [],
         };
@@ -623,6 +752,59 @@ export const apiProviders: ProviderSet = {
     },
 
     async updateStatus(id, hospitalId, status: EmergencyStatus) {
+      if (status === 'COMPLETED') {
+        try {
+          const existing = await this.getById(id, hospitalId);
+          if (existing) {
+            // 1. Archive to completed cases localStorage
+            const completedItem = { ...existing, status: 'COMPLETED' as EmergencyStatus };
+            const localKey = 'lifelink_completed_' + hospitalId;
+            const current: Emergency[] = JSON.parse(localStorage.getItem(localKey) || '[]');
+            const updated = [completedItem, ...current.filter((c: Emergency) => c.id !== id)];
+            localStorage.setItem(localKey, JSON.stringify(updated));
+
+            // 2. Free up assigned ambulance
+            if (existing.assignedAmbulance?.id) {
+              const ambId = existing.assignedAmbulance.id;
+              try {
+                await httpClient.request(`/hospitals/${encodeURIComponent(hospitalId)}/ambulances/${encodeURIComponent(ambId)}`, {
+                  method: 'PUT',
+                  body: JSON.stringify({ status: 'AVAILABLE' }),
+                });
+              } catch {}
+
+              const ambs = getLocalHospitalItems<Ambulance>(LOCAL_AMBULANCES_KEY, hospitalId);
+              const ambMatch = ambs.find((a) => a.id === ambId || a.vehicleNumber === existing.assignedAmbulance?.vehicleNumber);
+              if (ambMatch) {
+                ambMatch.status = 'AVAILABLE';
+                saveLocalHospitalItems(LOCAL_AMBULANCES_KEY, hospitalId, ambs);
+              }
+            }
+
+            // 3. Free up assigned doctor
+            if (existing.assignedDoctor?.id) {
+              const docId = existing.assignedDoctor.id;
+              try {
+                await httpClient.request(`/hospitals/${encodeURIComponent(hospitalId)}/doctors/${encodeURIComponent(docId)}`, {
+                  method: 'PUT',
+                  body: JSON.stringify({ status: 'AVAILABLE', current_cases: 0 }),
+                });
+              } catch {}
+
+              const docs = getLocalHospitalItems<Doctor>(LOCAL_DOCTORS_KEY, hospitalId);
+              const docMatch = docs.find((d) => d.id === docId);
+              if (docMatch) {
+                docMatch.status = 'AVAILABLE';
+                docMatch.currentCases = Math.max(0, (docMatch.currentCases ?? 1) - 1);
+                saveLocalHospitalItems(LOCAL_DOCTORS_KEY, hospitalId, docs);
+              }
+            }
+
+            window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT));
+          }
+        } catch {}
+      }
+
       try {
         const s = await httpClient.patch<BackendSOS>(`/sos/${encodeURIComponent(id)}/status`, {
           status: toApiHospitalStatus(status),
@@ -637,7 +819,7 @@ export const apiProviders: ProviderSet = {
           status,
           priority: { score: 95, level: 'CRITICAL', reasons: ['Updated'] },
           patient: { id: 'patient', name: 'Emergency Patient' },
-          location: { latitude: 19.7, longitude: 72.77, address: 'Emergency Location' },
+          location: { latitude: 19.697, longitude: 72.766, address: 'Emergency Location', area: 'Palghar District Emergency Zone', city: 'Palghar' },
           createdAt: new Date().toISOString(),
           timeline: [],
         };
